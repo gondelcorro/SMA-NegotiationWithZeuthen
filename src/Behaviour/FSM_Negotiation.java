@@ -175,10 +175,10 @@ public class FSM_Negotiation extends FSMBehaviour {
                     myAgent.send(msgZeuthen);
                 } else { // A RECHAZÓ, B QUEDÓ ESPERANDO.. ENTONCS A VUELVE A ENVIAR EN ESTE CASO EL ZEUTHEN A B
                     System.out.println("Agente " + myAgent.getLocalName() + ": Mi zeuthen es " + zeuthen );
-                    //ACLMessage propuesta = (ACLMessage) this.getDataStore().get("msgPropuesta");
-                    ACLMessage msgZeuthen = new ACLMessage(ACLMessage.INFORM);
-                    msgZeuthen.addReceiver((AID)ds.get(RECEIVER_AID));
-                    //ACLMessage msgZeuthen = propuesta.createReply();
+                    ACLMessage propuesta = (ACLMessage) this.getDataStore().get("msgPropuesta");
+                    //ACLMessage msgZeuthen = new ACLMessage(ACLMessage.INFORM);
+                    //msgZeuthen.addReceiver((AID)ds.get(RECEIVER_AID));
+                    ACLMessage msgZeuthen = propuesta.createReply();
                     //msgZeuthen.addReceiver(propuesta.getSender());
                     msgZeuthen.setPerformative(ACLMessage.INFORM);
                     msgZeuthen.setContentObject(zeuthen);
@@ -198,7 +198,7 @@ public class FSM_Negotiation extends FSMBehaviour {
 
     private class RecibirZeuthenOponente extends Behaviour {
 
-        private int zeuthen = 5;
+        private int proxEstado;
         private boolean received = false;
 
         @Override
@@ -210,13 +210,13 @@ public class FSM_Negotiation extends FSMBehaviour {
                     float miZeuthen = (float) this.getDataStore().get(("miZeuthen"));
                     System.out.println("Agente " + myAgent.getLocalName() + ": recibe zeuthen oponente... " + "(" + zuethenOponente + ")");
                     if (miZeuthen > zuethenOponente) {
-                        zeuthen = 5;
+                        proxEstado = 1; // mi zeuthen es mayor -> enviar propuesta
                         received = true;
-                        System.out.println("Agente " + myAgent.getLocalName() + ": Mi zeuthen es mayor.. espero propuesta");
+                        System.out.println("Agente " + myAgent.getLocalName() + ": Mi zeuthen es mayor.. envio propuesta");
                     } else {
-                        zeuthen = 1;
+                        proxEstado = 5; // mi zeuthen es menor -> esperar propuesta
                         received = true;
-                        System.out.println("Agente " + myAgent.getLocalName() + ": Mi zeuthen es menor.. envio propuesta");
+                        System.out.println("Agente " + myAgent.getLocalName() + ": Mi zeuthen es menor.. espero propuesta");
                     }
                 } catch (UnreadableException ex) {
                     System.out.println("Error en el msje recibiendo zeuthen: " + ex);
@@ -229,7 +229,7 @@ public class FSM_Negotiation extends FSMBehaviour {
 
         @Override
         public int onEnd() {
-            return zeuthen;
+            return proxEstado;
         }
 
         @Override
