@@ -127,7 +127,10 @@ public class AgentNegociator extends Agent {
             int randomPeliPos = (int) Math.abs(Math.random() * pelis.size());
             if (!listaRandomPeliPos.contains(randomPeliPos)) {
                 listaRandomPeliPos.add(randomPeliPos);
-                pelisVotadas.put(pelis.get(randomPeliPos).getName(), (float) Math.abs(Math.random() * 5));
+                if (this.getAID().getLocalName().equals("A"))
+                    pelisVotadas.put(pelis.get(randomPeliPos).getName(), (float) Math.abs(Math.random() * 1));
+                else
+                    pelisVotadas.put(pelis.get(randomPeliPos).getName(), (float) Math.abs(Math.random() * 5));
             }
         }
         System.out.println("Sus 10 pelis votadas son:");

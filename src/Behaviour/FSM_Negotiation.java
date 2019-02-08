@@ -33,10 +33,6 @@ public class FSM_Negotiation extends FSMBehaviour {
     private static final String ESPERAR_PROPUESTA = "EsperarPropuesta";
     private static final String EVALUAR_PROPUESTA_Y_RESPONDER = "EvaluarPropuestaYResponder";
 
-    //State's transition values
-    //public static int MI_ZEUTHEN_MAYOR = 1;
-    //public static int MI_ZEUTHEN_MENOR = 5;
-
     public FSM_Negotiation(AID agentID, Boolean inicio, ArrayList<String> peliculasDisponibles) {
 
         ds.put(RECEIVER_AID, agentID); // ID "B"
@@ -71,9 +67,19 @@ public class FSM_Negotiation extends FSMBehaviour {
         this.registerDefaultTransition(ESPERAR_RESPUESTA, CALCULAR_Y_ENVIAR_ZEUTHEN);
         this.registerDefaultTransition(EVALUAR_PROPUESTA_Y_RESPONDER, CALCULAR_Y_ENVIAR_ZEUTHEN);
         this.registerDefaultTransition(CALCULAR_Y_ENVIAR_ZEUTHEN, RECIBIR_ZEUTHEN_OPONENTE);
-        this.registerTransition(RECIBIR_ZEUTHEN_OPONENTE, ESPERAR_PROPUESTA, 5); //num de estado
+        String[] toBeReset = {RECIBIR_ZEUTHEN_OPONENTE};
+        this.registerTransition(RECIBIR_ZEUTHEN_OPONENTE, ESPERAR_PROPUESTA, 5,toBeReset); //num de estado
         this.registerDefaultTransition(ESPERAR_PROPUESTA, EVALUAR_PROPUESTA_Y_RESPONDER);
-        this.registerTransition(RECIBIR_ZEUTHEN_OPONENTE, ENVIAR_PROPUESTA, 1); //num de estado
+        this.registerTransition(RECIBIR_ZEUTHEN_OPONENTE, ENVIAR_PROPUESTA, 1, toBeReset); //num de estado
+       
+       /* this.registerDefaultTransition(ENVIAR_PROPUESTA, ESPERAR_RESPUESTA);
+        this.registerDefaultTransition(ESPERAR_RESPUESTA, CALCULAR_Y_ENVIAR_ZEUTHEN);
+        this.registerDefaultTransition(EVALUAR_PROPUESTA_Y_RESPONDER, RECIBIR_ZEUTHEN_OPONENTE);
+        this.registerDefaultTransition(CALCULAR_Y_ENVIAR_ZEUTHEN, RECIBIR_ZEUTHEN_OPONENTE);
+        String[] toBeReset = {RECIBIR_ZEUTHEN_OPONENTE};
+        this.registerTransition(RECIBIR_ZEUTHEN_OPONENTE, ESPERAR_PROPUESTA, 5,toBeReset); //num de estado
+        this.registerDefaultTransition(ESPERAR_PROPUESTA, EVALUAR_PROPUESTA_Y_RESPONDER);
+        this.registerTransition(RECIBIR_ZEUTHEN_OPONENTE, ENVIAR_PROPUESTA, 1, toBeReset); //num de estado*/
     }
 
     private class EnviarPropuesta extends Behaviour {
@@ -107,7 +113,6 @@ public class FSM_Negotiation extends FSMBehaviour {
                     msgPropuesta.setConversationId("negociacion-pelicula");
                     msgPropuesta.setReplyWith("propuesta" + System.currentTimeMillis()); // valor unico
                     myAgent.send(msgPropuesta);
-                    //MessageTemplate mt = MessageTemplate.and(MessageTemplate.MatchConversationId("negociacion-pelicula"), MessageTemplate.MatchInReplyTo(msgPropuesta.getReplyWith()));
                     System.out.println("Agente " + myAgent.getLocalName() + ": Envia propuesta: " + movie.getName());
                     envio = true;
                     primeraVez = false;
@@ -136,7 +141,7 @@ public class FSM_Negotiation extends FSMBehaviour {
                 } else { //si rechazó
                     this.getDataStore().put("propuestaDelOtroAgente", msgRespuesta.getContent()); //Guardo la propuesta actual del otro agente en el DS
                     System.out.println("Agente " + myAgent.getLocalName() + ": Propuesta rechazada... paso a informar zeuthen...");
-                    this.getDataStore().put("msgRechazo", msgRespuesta); // El msj de respuesta es un rechazo, lo guardo
+                    //this.getDataStore().put("msgRechazo", msgRespuesta); // El msj de respuesta es un rechazo, lo guardo
                     respuesta = true;
                 }
             } else {
@@ -171,9 +176,16 @@ public class FSM_Negotiation extends FSMBehaviour {
                     ACLMessage msgZeuthen = msgRechazo.createReply();
                     msgZeuthen.setPerformative(ACLMessage.INFORM);
                     msgZeuthen.setContentObject(zeuthen);
+                    
+                    this.getDataStore().put("msgRechazo", msgZeuthen);
+                    System.out.println("" + (ACLMessage) this.getDataStore().get("msgRechazo"));
+                    
                     envioZeuthen = true;
                     myAgent.send(msgZeuthen);
-                } else { // A RECHAZÓ, B QUEDÓ ESPERANDO.. ENTONCS A VUELVE A ENVIAR EN ESTE CASO EL ZEUTHEN A B
+                }else{
+                    System.out.println("ERROR msgRechazo null...");
+                }
+              /*  } else { // A RECHAZÓ, B QUEDÓ ESPERANDO.. ENTONCS A VUELVE A ENVIAR EN ESTE CASO EL ZEUTHEN A B
                     System.out.println("Agente " + myAgent.getLocalName() + ": Mi zeuthen es " + zeuthen );
                     ACLMessage propuesta = (ACLMessage) this.getDataStore().get("msgPropuesta");
                     //ACLMessage msgZeuthen = new ACLMessage(ACLMessage.INFORM);
@@ -184,7 +196,7 @@ public class FSM_Negotiation extends FSMBehaviour {
                     msgZeuthen.setContentObject(zeuthen);
                     envioZeuthen = true;
                     myAgent.send(msgZeuthen);
-                }
+                }*/
             } catch (IOException ex) {
                 System.out.println("Error en el msje");
             }
@@ -203,9 +215,11 @@ public class FSM_Negotiation extends FSMBehaviour {
 
         @Override
         public void action() {
-            ACLMessage msgZeuthen = myAgent.receive();
+            MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.INFORM);
+            ACLMessage msgZeuthen = myAgent.receive(mt);
             if (msgZeuthen != null) {
                 try {
+                    
                     float zuethenOponente = (float) msgZeuthen.getContentObject();
                     float miZeuthen = (float) this.getDataStore().get(("miZeuthen"));
                     System.out.println("Agente " + myAgent.getLocalName() + ": recibe zeuthen oponente... " + "(" + zuethenOponente + ")");
@@ -225,6 +239,11 @@ public class FSM_Negotiation extends FSMBehaviour {
                 block();
                 System.out.println("Agente " + myAgent.getLocalName() + ": Esperando Zeuthen oponente...");
             }
+        }
+        
+        @Override
+        public void reset(){
+            received = false;
         }
 
         @Override
@@ -284,8 +303,9 @@ public class FSM_Negotiation extends FSMBehaviour {
                         this.getDataStore().put("propuestaDelOtroAgente", peliPropuesta); //guarda la propuesta actual del otro agente (q viene en el msj)
                         respuesta.setPerformative(ACLMessage.REJECT_PROPOSAL);
                         respuesta.setContent(agente.getPropuestaActual());//cuando rechaza la propuesta q recibe, recuerda la suya
-                        evaluarYResponder = true;
                         myAgent.send(respuesta);
+                        evaluarYResponder = true;
+                        this.getDataStore().put("msgRechazo", respuesta); // El msj de respuesta es un rechazo, lo guardo
                         System.out.println("Agente " + myAgent.getLocalName() + ": Propuesta: " + peliPropuesta + " - RECHAZADA");
                     }
                 } catch (UnreadableException ex) {
