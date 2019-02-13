@@ -22,12 +22,12 @@ import java.util.HashMap;
 public class AgentNegociator extends Agent {
 
     private AID AgentReceiverID;
-    private HashMap<String, Float> pelisVotadas; //se supone vistas
-    private HashMap<String, Float> utilidades;
-    private ArrayList<Movie> pelis; //todas las pelis 
-    private ArrayList<String> propuestasDisponibles; // no vistas
+    private HashMap<Movie, Float> peliculasVotadas; //se supone vistas
+    private HashMap<Movie, Float> utilidades;
+    private ArrayList<Movie> catalogoPeliculas; //todas las pelis 
+    private ArrayList<Movie> propuestasDisponibles; // no vistas
     private Boolean inicio = false;
-    private String propuestaActual;
+    private Movie propuestaActual;
 
     protected void setup() {
         System.out.println("*** Bienvenido agente " + this.getLocalName() + " ***");
@@ -43,8 +43,8 @@ public class AgentNegociator extends Agent {
             SearchConstraints sc = new SearchConstraints();
             sc.setMaxResults(new Long(1));
 
-            this.loadPelis();
-            this.loadPelisVotadas();
+            this.loadPeliculas();
+            this.loadPeliculasVotadas();
             this.loadPropuestasDisp();
             this.loadUtilidades();
             this.propuestaActual = this.elegirPropuesta(); //elegir la propuesta inicial segun MCP!
@@ -59,7 +59,7 @@ public class AgentNegociator extends Agent {
                             DFAgentDescription[] result = DFService.decodeNotification(inform.getContent());
                             if (result.length > 0) {
                                 AgentReceiverID = result[0].getName();
-                                addBehaviour(new FSM_Negotiation(AgentReceiverID, inicio, propuestasDisponibles));
+                                addBehaviour(new FSM_Negotiation(AgentReceiverID, inicio));
                             }
                         } catch (FIPAException ex) {
                             System.out.println("error en la suscripcion al servicio: " + ex);
@@ -70,7 +70,7 @@ public class AgentNegociator extends Agent {
                 System.out.println("NO HAY SERVICIO - PUBLICO");
                 DFService.register(this, dfd);
                 inicio = true;
-                this.addBehaviour(new FSM_Negotiation(this.getAID(), inicio, propuestasDisponibles));
+                this.addBehaviour(new FSM_Negotiation(this.getAID(), inicio));
             }
         } catch (FIPAException ex) {
             System.out.println("error buscando el servicio: " + ex);
@@ -91,8 +91,8 @@ public class AgentNegociator extends Agent {
         System.out.println("Agente " + getAID().getLocalName() + " terminado.");
     }
 
-    private void loadPelis() {
-        pelis = new ArrayList<>();
+    private void loadPeliculas() {
+        catalogoPeliculas = new ArrayList<>();
         File archivo = null;
         FileReader fr = null;
         BufferedReader br = null;
@@ -104,7 +104,7 @@ public class AgentNegociator extends Agent {
             while ((linea = br.readLine()) != null) {
                 Movie movie = new Movie();
                 movie.setName(linea);
-                pelis.add(movie);
+                catalogoPeliculas.add(movie);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -119,29 +119,28 @@ public class AgentNegociator extends Agent {
         }
     }
 
-    private void loadPelisVotadas() {
-        pelisVotadas = new HashMap<>();
+    private void loadPeliculasVotadas() {//elijo una peli aleatoriamente del cataloPeliculas y le calculo un rating aleatorio
+        peliculasVotadas = new HashMap<>(); //<Moviee, Float>
         ArrayList listaRandomPeliPos = new ArrayList();
-        //elijo una peli aleatoriamente de "pelis"
-        for (int i = 0; i < 10; i++) {
-            int randomPeliPos = (int) Math.abs(Math.random() * pelis.size());
+        for (int i = 0; i < 10; i++) { //se votan 10 pelis aleatoriamente
+            int randomPeliPos = (int) Math.abs(Math.random() * catalogoPeliculas.size());
             if (!listaRandomPeliPos.contains(randomPeliPos)) {
                 listaRandomPeliPos.add(randomPeliPos);
                 if (this.getAID().getLocalName().equals("A"))
-                    pelisVotadas.put(pelis.get(randomPeliPos).getName(), (float) Math.abs(Math.random() * 1));
+                    peliculasVotadas.put(catalogoPeliculas.get(randomPeliPos), (float) Math.abs(Math.random() * 1));
                 else
-                    pelisVotadas.put(pelis.get(randomPeliPos).getName(), (float) Math.abs(Math.random() * 5));
+                    peliculasVotadas.put(catalogoPeliculas.get(randomPeliPos), (float) Math.abs(Math.random() * 5));
             }
         }
         System.out.println("Sus 10 pelis votadas son:");
-        pelisVotadas.forEach((k, v) -> System.out.print("Peli: " + k + " Rating: " + v + " - "));
+        peliculasVotadas.forEach((k, v) -> System.out.print("Peli: " + k.getName() + " Rating: " + v + " - "));
     }
 
-    private void loadPropuestasDisp() {
+    private void loadPropuestasDisp() {// las pelis disponibles son las q no voto (se asume q no las vio)
         this.propuestasDisponibles = new ArrayList<>();
-        for (Movie peli : pelis) {
-            if (!pelisVotadas.containsKey(peli.getName())) {
-                propuestasDisponibles.add(peli.getName());
+        for (Movie peli : catalogoPeliculas) {
+            if (!peliculasVotadas.containsKey(peli)) {
+                propuestasDisponibles.add(peli);
             }
         }
         Collections.shuffle(propuestasDisponibles);//Randomiza la lista
@@ -149,17 +148,17 @@ public class AgentNegociator extends Agent {
     }
 
     private void loadUtilidades() {
-        utilidades = new HashMap<>();
-        for (Movie peli : pelis) {
-            if (pelisVotadas.containsKey(peli.getName())) {
-                utilidades.put(peli.getName(), pelisVotadas.get(peli.getName()));// el nom de la peli y el rating q se le puso xq ya esta votada
+        utilidades = new HashMap<>(); //<Moviee, Float>
+        for (Movie peli : catalogoPeliculas) {
+            if (peliculasVotadas.containsKey(peli)) {
+                utilidades.put(peli, peliculasVotadas.get(peli));// la peli y el rating q se le puso xq ya esta votada
             } else {
-                utilidades.put(peli.getName(), (float) Math.abs(Math.random() * (5))); //si la peli no fue votada le genero aleatoriamente un rating
+                utilidades.put(peli, (float) Math.abs(Math.random() * (5))); //si la peli no fue votada le genero aleatoriamente un rating
             }
         }
     }
 
-    public String elegirPropuesta() { // La eleccion es tomar la 1era de pelisDisponibles
+    public Movie elegirPropuesta() { // La eleccion es tomar la 1era pelicula de pelisDisponibles
         if (!this.propuestasDisponibles.isEmpty()) {
             propuestaActual = this.propuestasDisponibles.remove(0);
             return propuestaActual;
@@ -167,16 +166,16 @@ public class AgentNegociator extends Agent {
         return null;
     }
 
-    public boolean aceptaPropuesta(String peli) {
-        System.out.println("Agente " + this.getLocalName() + ": UPeliPropuesta(" + peli + ")= " + this.getUtilidad(peli) + " | UMiPropuesta(" + propuestaActual + ")=" + this.getUtilidad(this.propuestaActual));
-        return (this.getUtilidad(peli) >= this.getUtilidad(this.propuestaActual));
+    public boolean aceptaPropuesta(Movie peli) {// se acepta si la utilidad d la peli prop es > q la prop actual
+        System.out.println("Agente " + this.getLocalName() + ": UPeliPropuesta(" + peli.getName() + ")= " + this.getUtilidad(peli) + " | UMiPropuesta(" + propuestaActual.getName() + ")=" + this.getUtilidad(this.propuestaActual));
+        return (this.getUtilidad(peli) >= this.getUtilidad(this.getPropuestaActual()));
     }
 
-    public float getUtilidad(String peli) {
+    public float getUtilidad(Movie peli) {
         return utilidades.get(peli);
     }
 
-    public String getPropuestaActual() {
+    public Movie getPropuestaActual() {
         return this.propuestaActual;
     }
 }

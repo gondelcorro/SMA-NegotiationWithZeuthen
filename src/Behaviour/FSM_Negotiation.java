@@ -9,12 +9,15 @@ import jade.core.AID;
 import jade.core.behaviours.Behaviour;
 import jade.core.behaviours.DataStore;
 import jade.core.behaviours.FSMBehaviour;
+import jade.core.behaviours.OneShotBehaviour;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 import jade.lang.acl.UnreadableException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class FSM_Negotiation extends FSMBehaviour {
 
@@ -32,21 +35,20 @@ public class FSM_Negotiation extends FSMBehaviour {
     private static final String S3_CALCULAR_Y_ENVIAR_ZEUTHEN = "CalcularYEnviarZeuthen";
     private static final String S4_RECIBIR_ZEUTHEN_OPONENTE = "RecibirZeuthenOponente";
     private static final String S5_EVALUAR_PROPUESTA_Y_RESPONDER = "EvaluarPropuestaYResponder";
+    private static final String S6_FINALIZAR_NEGOCIACION = "FinalizarNegociacion";
 
-    public FSM_Negotiation(AID agentID, Boolean inicio, ArrayList<String> peliculasDisponibles) {
+    public FSM_Negotiation(AID agentID, Boolean inicio) {
 
-        ds.put(RECEIVER_AID, agentID); // ID "B"
-        ds.put(PELICULAS_DISPONIBLES, peliculasDisponibles);
+        ds.put(RECEIVER_AID, agentID); // ID "A"
         System.out.println("*** Inicia Negociacion ***");
-        if (inicio) {
+        if (inicio) {// si no hay servicio -> publica y espera propuesta
             EsperarPropuesta s1 = new EsperarPropuesta();
             s1.setDataStore(ds);
             this.registerFirstState(s1, S1B_ESPERAR_PROPUESTA);
-
+            //Agrego este estado para q queden todos registrados en la FSM
             EnviarPropuesta sX = new EnviarPropuesta();
             sX.setDataStore(ds);
             this.registerState(sX, S1A_ENVIAR_PROPUESTA);
-
         } else {
             EnviarPropuesta s1 = new EnviarPropuesta();
             s1.setDataStore(ds);
@@ -72,15 +74,20 @@ public class FSM_Negotiation extends FSMBehaviour {
         s5.setDataStore(ds);
         this.registerState(s5, S5_EVALUAR_PROPUESTA_Y_RESPONDER);
 
+        FinalizarNegociacion s6 = new FinalizarNegociacion();
+        s6.setDataStore(ds);
+        this.registerLastState(s6, S6_FINALIZAR_NEGOCIACION);
+
         this.registerDefaultTransition(S1A_ENVIAR_PROPUESTA, S2_ESPERAR_RESPUESTA);
         this.registerDefaultTransition(S1B_ESPERAR_PROPUESTA, S5_EVALUAR_PROPUESTA_Y_RESPONDER);
-        this.registerDefaultTransition(S2_ESPERAR_RESPUESTA, S3_CALCULAR_Y_ENVIAR_ZEUTHEN);
+        this.registerTransition(S5_EVALUAR_PROPUESTA_Y_RESPONDER, S6_FINALIZAR_NEGOCIACION, 1);
+        this.registerTransition(S2_ESPERAR_RESPUESTA, S6_FINALIZAR_NEGOCIACION, 1);
+        this.registerTransition(S2_ESPERAR_RESPUESTA, S3_CALCULAR_Y_ENVIAR_ZEUTHEN, 0);
         this.registerDefaultTransition(S3_CALCULAR_Y_ENVIAR_ZEUTHEN, S4_RECIBIR_ZEUTHEN_OPONENTE);
-        this.registerDefaultTransition(S5_EVALUAR_PROPUESTA_Y_RESPONDER, S3_CALCULAR_Y_ENVIAR_ZEUTHEN);
+        this.registerTransition(S5_EVALUAR_PROPUESTA_Y_RESPONDER, S3_CALCULAR_Y_ENVIAR_ZEUTHEN, 0);
         String[] toBeReset = {S4_RECIBIR_ZEUTHEN_OPONENTE};
-        this.registerTransition(S4_RECIBIR_ZEUTHEN_OPONENTE, S1B_ESPERAR_PROPUESTA, 5, toBeReset); //num de estado
-
-        this.registerTransition(S4_RECIBIR_ZEUTHEN_OPONENTE, S1A_ENVIAR_PROPUESTA, 1, toBeReset); //num de estado 
+        this.registerTransition(S4_RECIBIR_ZEUTHEN_OPONENTE, S1B_ESPERAR_PROPUESTA, 5, toBeReset);
+        this.registerTransition(S4_RECIBIR_ZEUTHEN_OPONENTE, S1A_ENVIAR_PROPUESTA, 1, toBeReset);
     }
 
     private class EnviarPropuesta extends Behaviour {
@@ -90,38 +97,36 @@ public class FSM_Negotiation extends FSMBehaviour {
 
         @Override
         public void action() {
-            AgentNegociator ag = ((AgentNegociator) myAgent);
-            String sigPropuesta;
+            AgentNegociator agentNegotiator = ((AgentNegociator) myAgent);
+            Movie sigPropuesta;
             if (primeraVez) {
-                sigPropuesta = ag.getPropuestaActual();
+                sigPropuesta = agentNegotiator.getPropuestaActual();
             } else {
-                sigPropuesta = ag.elegirPropuesta();
-
+                sigPropuesta = agentNegotiator.elegirPropuesta();
             }
             if (sigPropuesta == null) { // if == null => no hay más!
                 System.out.println("NO HAY MAS PELICULAS PARA PROPONER");
             } else { //Arma el mensaje! y lo envia
                 try {
                     Movie movie = new Movie();
-                    movie.setName(sigPropuesta);
+                    movie.setName(sigPropuesta.getName());
                     SeeMovie seeMovie = new SeeMovie();
                     seeMovie.setMovie(movie);
-                    seeMovie.setDate(new Date(2018, 9, 17));
+                    seeMovie.setDate(new Date(2019, 02, 13));
                     ACLMessage ultMsg = (ACLMessage) this.getDataStore().get("msgUltimo");
                     ACLMessage msgPropuesta;
-                    if (ultMsg != null) {
+                    if (ultMsg != null) {//ya hubo negociacion -> creo respuesta
                         msgPropuesta = ultMsg.createReply();
                         msgPropuesta.setPerformative(ACLMessage.PROPOSE);
                     } else {
                         msgPropuesta = new ACLMessage(ACLMessage.PROPOSE);
-                        msgPropuesta.addReceiver((AID) this.getDataStore().get(RECEIVER_AID));
+                        msgPropuesta.addReceiver((AID) this.getDataStore().get(RECEIVER_AID)); // 1era vez se envia al receiver (A xq publico el servicio)
                         msgPropuesta.setLanguage(MCPOntology.getCodecInstance().getName());
                         msgPropuesta.setOntology(MCPOntology.getInstance().getName());
                         msgPropuesta.setConversationId("negociacion-pelicula");
                         msgPropuesta.setReplyWith("propuesta" + System.currentTimeMillis()); // valor unico
                     }
                     msgPropuesta.setContentObject(seeMovie);
-
                     myAgent.send(msgPropuesta);
                     System.out.println("Agente " + myAgent.getLocalName() + ": Envia propuesta: " + movie.getName());
                     envio = true;
@@ -141,24 +146,34 @@ public class FSM_Negotiation extends FSMBehaviour {
     private class EsperarRespuesta extends Behaviour {
 
         boolean respuesta = false;
+        private int acepta = 0;
 
         public void action() {
             ACLMessage msgRespuesta = myAgent.receive();
             if (msgRespuesta != null) {// respuesta recibida
                 if (msgRespuesta.getPerformative() == ACLMessage.ACCEPT_PROPOSAL) {
                     System.out.println("Agente " + myAgent.getLocalName() + ": Propuesta aceptada - FIN DE LA NEGOCIACION");
-                    myAgent.doDelete();
-                } else { //si rechazó
-                    this.getDataStore().put("propuestaDelOtroAgente", msgRespuesta.getContent()); //Guardo la propuesta actual del otro agente en el DS
+                    acepta = 1;
+                    respuesta = true;
+                } else { try {
+                    //si rechazó
+                    this.getDataStore().put("propuestaDelOtroAgente", msgRespuesta.getContentObject()); //Guardo la propuesta actual del otro agente en el DS
+                    } catch (UnreadableException ex) {
+                        System.out.println("" + ex);
+                    }
                     System.out.println("Agente " + myAgent.getLocalName() + ": Propuesta rechazada... paso a informar zeuthen...");
-                    this.getDataStore().put("msgRechazo", msgRespuesta); // El msj de respuesta es un rechazo, lo guardo
-                    this.getDataStore().put("msgUltimo", msgRespuesta);
+                    this.getDataStore().put("msgUltimo", msgRespuesta); // guarda el ultimo msg recibido (msg de rechazo q contiene la prop del otro agente)
                     respuesta = true;
                 }
             } else {
                 block();
                 System.out.println("Agente " + myAgent.getLocalName() + ": Esperando respuesta..");
             }
+        }
+
+        @Override
+        public int onEnd() {
+            return acepta;
         }
 
         @Override
@@ -174,23 +189,24 @@ public class FSM_Negotiation extends FSMBehaviour {
         @Override
         public void action() {
 
-            AgentNegociator agente = ((AgentNegociator) myAgent);
-            float utilidadPropActual = agente.getUtilidad(agente.getPropuestaActual());
-            String propuestaOponente = (String) this.getDataStore().get("propuestaDelOtroAgente");
-            float utilidadPropuestaOponente = agente.getUtilidad(propuestaOponente);
-            float zeuthen = (utilidadPropActual - utilidadPropuestaOponente) / utilidadPropActual;//Calculo el zeuthen
-            this.getDataStore().put("miZeuthen", zeuthen);
-
             try {
-                ACLMessage msgRechazo = (ACLMessage) this.getDataStore().get("msgUltimo"); //msgRechazo
+                AgentNegociator agente = ((AgentNegociator) myAgent);
+                float utilidadPropActual = agente.getUtilidad(agente.getPropuestaActual());
+                Movie movie = (Movie) this.getDataStore().get("propuestaDelOtroAgente"); // contiene la propuesta del otro agente
+                float utilidadPropuestaOponente = agente.getUtilidad(movie);
+                float zeuthen = (utilidadPropActual - utilidadPropuestaOponente) / utilidadPropActual;//Calculo el zeuthen
+                
+                IsMyZeuthen myZeuthen = new IsMyZeuthen();
+                myZeuthen.setValue(zeuthen);
+                this.getDataStore().put("miZeuthen", myZeuthen);
+                System.out.println("Agente " + myAgent.getLocalName() + ": Mi zeuthen es " + myZeuthen.getValue());
+
+                ACLMessage msgRechazo = (ACLMessage) this.getDataStore().get("msgUltimo"); //cada agente toma su ultimo msg
                 ACLMessage msgZeuthen = msgRechazo.createReply();
                 msgZeuthen.setPerformative(ACLMessage.INFORM);
-                msgZeuthen.setContentObject(zeuthen);
-
-                this.getDataStore().put("miZeuthen", zeuthen);
-                System.out.println("Agente " + myAgent.getLocalName() + ": Mi zeuthen es " + zeuthen);
+                msgZeuthen.setContentObject(myZeuthen);
                 envioZeuthen = true;
-                myAgent.send(msgZeuthen);
+                myAgent.send(msgZeuthen); // se informa el zeuthen
 
             } catch (IOException | NullPointerException ex) {
                 System.out.println("Agente " + myAgent.getLocalName() + ": Error en el msje: " + ex);
@@ -214,10 +230,10 @@ public class FSM_Negotiation extends FSMBehaviour {
             ACLMessage msgZeuthen = myAgent.receive(mt);
             if (msgZeuthen != null) {
                 try {
-                    float zuethenOponente = (float) msgZeuthen.getContentObject();
-                    float miZeuthen = (float) this.getDataStore().get(("miZeuthen"));
-                    System.out.println("Agente " + myAgent.getLocalName() + ": Recibe zeuthen oponente... " + "(" + zuethenOponente + ")");
-                    if (miZeuthen > zuethenOponente) {
+                    IsMyZeuthen zuethenOponente = (IsMyZeuthen) msgZeuthen.getContentObject();
+                    IsMyZeuthen miZeuthen = (IsMyZeuthen) this.getDataStore().get(("miZeuthen"));
+                    System.out.println("Agente " + myAgent.getLocalName() + ": Recibe zeuthen oponente... " + "(" + zuethenOponente.getValue() + ")");
+                    if (miZeuthen.getValue() > zuethenOponente.getValue()) {
                         proxEstado = 1; // mi zeuthen es mayor -> enviar propuesta
                         received = true;
                         System.out.println("Agente " + myAgent.getLocalName() + ": Mi zeuthen es mayor.. envio propuesta");
@@ -237,19 +253,16 @@ public class FSM_Negotiation extends FSMBehaviour {
 
         @Override
         public void reset() {
-            //proxEstado = 1;
             received = false;
         }
 
         @Override
         public int onEnd() {
-            System.out.println("*********OnEnd: " + proxEstado);
             return proxEstado;
         }
 
         @Override
         public boolean done() {
-            System.out.println("*********done: " + received);
             return received;
         }
     }
@@ -263,7 +276,7 @@ public class FSM_Negotiation extends FSMBehaviour {
             MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.PROPOSE);
             ACLMessage msgPropuesta = myAgent.receive(mt);
             if (msgPropuesta != null) {
-                this.getDataStore().put("msgPropuesta", msgPropuesta);
+                this.getDataStore().put("msgPropuesta", msgPropuesta);//guarda la propuesta q le hicieron
                 this.getDataStore().put("msgUltimo", msgPropuesta);
                 System.out.println("Agente " + myAgent.getLocalName() + ": Propuesta recibida.. paso a evaluar propusta y responder...");
                 esperarPropuesta = true;
@@ -281,32 +294,33 @@ public class FSM_Negotiation extends FSMBehaviour {
 
     private class EvaluarPropuestaYResponder extends Behaviour {
 
+        private int acepta = 0;
         private Boolean evaluarYResponder = false;
 
         @Override
         public void action() {
-            ACLMessage propuesta = (ACLMessage) this.getDataStore().get("msgPropuesta");
+            ACLMessage propuesta = (ACLMessage) this.getDataStore().get("msgPropuesta"); 
             if (propuesta != null) {
                 try {// Propuesta recibida
                     AgentNegociator agente = ((AgentNegociator) myAgent);
                     ACLMessage respuesta = propuesta.createReply();
                     SeeMovie seeMovie = (SeeMovie) propuesta.getContentObject();
-                    String peliPropuesta = seeMovie.getMovie().getName();
+                    Movie peliPropuesta = seeMovie.getMovie();
                     if (agente.aceptaPropuesta(peliPropuesta)) { // SI EL AGENTE ACEPTA LA PROPUESTA TERMINA LA NEGOCIACION
                         respuesta.setPerformative(ACLMessage.ACCEPT_PROPOSAL);
-                        System.out.println("Agente " + myAgent.getLocalName() + ": Propuesta: " + peliPropuesta + " - ACEPTADA");
+                        System.out.println("Agente " + myAgent.getLocalName() + ": Propuesta: " + peliPropuesta.getName() + " - ACEPTADA");
                         myAgent.send(respuesta);
-                        myAgent.doDelete();
+                        acepta = 1;
+                        evaluarYResponder = true;
                     } else { // EL AGENTE RECHAZA LA PROPUESTA
-                        this.getDataStore().put("propuestaDelOtroAgente", peliPropuesta); //guarda la propuesta actual del otro agente (q viene en el msj)
+                        this.getDataStore().put("propuestaDelOtroAgente", peliPropuesta); //guarda la propuesta (Movie) actual del otro agente (q viene en el msj)
                         respuesta.setPerformative(ACLMessage.REJECT_PROPOSAL);
-                        respuesta.setContent(agente.getPropuestaActual());//cuando rechaza la propuesta q recibe, recuerda la suya
+                        respuesta.setContentObject(agente.getPropuestaActual());//cuando rechaza la propuesta q recibe, recuerda la suya
                         myAgent.send(respuesta);
                         evaluarYResponder = true;
-                        this.getDataStore().put("msgRechazo", respuesta); // El msj de respuesta es un rechazo, lo guardo
-                        System.out.println("Agente " + myAgent.getLocalName() + ": Propuesta: " + peliPropuesta + " - RECHAZADA");
+                        System.out.println("Agente " + myAgent.getLocalName() + ": Propuesta: " + peliPropuesta.getName() + " - RECHAZADA");
                     }
-                } catch (UnreadableException ex) {
+                } catch (IOException | UnreadableException ex) {
                     System.out.println("Error leyendo el contenido del msj");
                 }
             } else {
@@ -316,8 +330,21 @@ public class FSM_Negotiation extends FSMBehaviour {
         }
 
         @Override
+        public int onEnd() {
+            return acepta;
+        }
+
+        @Override
         public boolean done() {
             return evaluarYResponder;
         }
+    }
+
+    public class FinalizarNegociacion extends OneShotBehaviour {
+
+        public void action() {
+            System.out.println("Agente " + myAgent.getLocalName() + ": Terminado.");
+        }
+
     }
 }

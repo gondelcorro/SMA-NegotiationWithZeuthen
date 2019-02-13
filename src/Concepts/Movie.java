@@ -3,6 +3,7 @@ package Concepts;
 import jade.content.Concept;
 import java.util.Date;
 import jade.util.leap.List;
+import java.util.Objects;
 
 public class Movie implements Concept{
     
@@ -71,6 +72,41 @@ public class Movie implements Concept{
     
     public String toString(){
         return this.name;
+    }
+
+    //SOBREESCRIBIR equals y hashcode para poder comparar movies usando hashmap
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        hash = 67 * hash + Objects.hashCode(this.name);
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final Movie other = (Movie) obj;
+        if (!Objects.equals(this.name, other.name)) {
+            return false;
+        }
+        if (!Objects.equals(this.director, other.director)) {
+            return false;
+        }
+        if (!Objects.equals(this.year, other.year)) {
+            return false;
+        }
+        if (!Objects.equals(this.actors, other.actors)) {
+            return false;
+        }
+        return true;
     }
     
     
