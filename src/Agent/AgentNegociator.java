@@ -18,6 +18,7 @@ import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Map;
 
 public class AgentNegociator extends Agent {
 
@@ -26,6 +27,7 @@ public class AgentNegociator extends Agent {
     private HashMap<Movie, Float> utilidades;
     private ArrayList<Movie> catalogoPeliculas; //todas las pelis 
     private ArrayList<Movie> propuestasDisponibles; // no vistas
+    private ArrayList<Movie> propDispOrdenadas; // de mayor a manor segun la utilidad
     private Boolean inicio = false;
     private Movie propuestaActual;
 
@@ -47,6 +49,7 @@ public class AgentNegociator extends Agent {
             this.loadPeliculasVotadas();
             this.loadPropuestasDisp();
             this.loadUtilidades();
+            this.ordenarPropuestasDisponibles();
             this.propuestaActual = this.elegirPropuesta(); //elegir la propuesta inicial segun MCP!
 
             DFAgentDescription[] result = DFService.search(this, dfd);
@@ -79,7 +82,7 @@ public class AgentNegociator extends Agent {
 
     @Override
     protected void takeDown() {
-       /* if (!suscripcionCancelada) {
+        /* if (!suscripcionCancelada) {
             try {
                 DFService.deregister(this);
                 suscripcionCancelada = true;
@@ -126,10 +129,11 @@ public class AgentNegociator extends Agent {
             int randomPeliPos = (int) Math.abs(Math.random() * catalogoPeliculas.size());
             if (!listaRandomPeliPos.contains(randomPeliPos)) {
                 listaRandomPeliPos.add(randomPeliPos);
-                if (this.getAID().getLocalName().equals("A"))
+                if (this.getLocalName().equals("A")) {
                     peliculasVotadas.put(catalogoPeliculas.get(randomPeliPos), (float) Math.abs(Math.random() * 1));
-                else
+                } else {
                     peliculasVotadas.put(catalogoPeliculas.get(randomPeliPos), (float) Math.abs(Math.random() * 5));
+                }
             }
         }
         System.out.println("Sus 10 pelis votadas son:");
@@ -147,7 +151,7 @@ public class AgentNegociator extends Agent {
         System.out.println("\nPelis disponibles: " + propuestasDisponibles);
     }
 
-    private void loadUtilidades() {
+    private void loadUtilidades() {// utilidades tendra un rating asignado para c/pelicula del catalogo
         utilidades = new HashMap<>(); //<Moviee, Float>
         for (Movie peli : catalogoPeliculas) {
             if (peliculasVotadas.containsKey(peli)) {
@@ -158,9 +162,24 @@ public class AgentNegociator extends Agent {
         }
     }
 
+    private void ordenarPropuestasDisponibles() {
+        //Ordenar la lista de peliculas disponibles por mayor utilidad en el hashmap utilidades
+        this.propDispOrdenadas = new ArrayList<>();
+        HashMap<Movie, Float> utilidadesAux = (HashMap<Movie, Float>) utilidades.clone();
+        for (Movie peli : propuestasDisponibles) {
+            if (utilidadesAux.containsKey(peli)) {
+                Movie peliConMayorUtilidad = (Movie) Collections.max(utilidadesAux.entrySet(), Map.Entry.comparingByValue()).getKey();
+                if(peli.getName().equals(peliConMayorUtilidad.getName())){
+                    propDispOrdenadas.add(peli);
+                    utilidadesAux.remove(peli);
+                }
+            }
+        }
+    }
+
     public Movie elegirPropuesta() { // La eleccion es tomar la 1era pelicula de pelisDisponibles
-        if (!this.propuestasDisponibles.isEmpty()) {
-            propuestaActual = this.propuestasDisponibles.remove(0);
+        if (!this.propDispOrdenadas.isEmpty()) {
+            propuestaActual = this.propDispOrdenadas.remove(0);
             return propuestaActual;
         }
         return null;

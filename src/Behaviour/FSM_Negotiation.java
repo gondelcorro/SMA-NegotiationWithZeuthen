@@ -75,16 +75,18 @@ public class FSM_Negotiation extends FSMBehaviour {
         s6.setDataStore(ds);
         this.registerLastState(s6, S6_FINALIZAR_NEGOCIACION);
 
+        String[] toBeReset = {S4_RECIBIR_ZEUTHEN_OPONENTE};
+        String[] toBeReset1 = {S1B_ESPERAR_PROPUESTA};
+        String[] toBeReset2 = {S2_ESPERAR_RESPUESTA};
         this.registerDefaultTransition(S1A_ENVIAR_PROPUESTA, S2_ESPERAR_RESPUESTA);
-        this.registerDefaultTransition(S1B_ESPERAR_PROPUESTA, S5_EVALUAR_PROPUESTA_Y_RESPONDER);
+        this.registerDefaultTransition(S1B_ESPERAR_PROPUESTA, S5_EVALUAR_PROPUESTA_Y_RESPONDER ,toBeReset1 ); //cuando sale del comp ahi agrego el reset
         this.registerTransition(S5_EVALUAR_PROPUESTA_Y_RESPONDER, S6_FINALIZAR_NEGOCIACION, 1);
-        this.registerTransition(S2_ESPERAR_RESPUESTA, S6_FINALIZAR_NEGOCIACION, 1);
-        this.registerTransition(S2_ESPERAR_RESPUESTA, S3_CALCULAR_Y_ENVIAR_ZEUTHEN, 0);
+        this.registerTransition(S2_ESPERAR_RESPUESTA, S6_FINALIZAR_NEGOCIACION, 1, toBeReset2);
+        this.registerTransition(S2_ESPERAR_RESPUESTA, S3_CALCULAR_Y_ENVIAR_ZEUTHEN, 0 , toBeReset2);
         this.registerDefaultTransition(S3_CALCULAR_Y_ENVIAR_ZEUTHEN, S4_RECIBIR_ZEUTHEN_OPONENTE);
         this.registerTransition(S5_EVALUAR_PROPUESTA_Y_RESPONDER, S3_CALCULAR_Y_ENVIAR_ZEUTHEN, 0);
-        //String[] toBeReset = {S4_RECIBIR_ZEUTHEN_OPONENTE};
-        this.registerTransition(S4_RECIBIR_ZEUTHEN_OPONENTE, S1B_ESPERAR_PROPUESTA, 5);
-        this.registerTransition(S4_RECIBIR_ZEUTHEN_OPONENTE, S1A_ENVIAR_PROPUESTA, 1);
+        this.registerTransition(S4_RECIBIR_ZEUTHEN_OPONENTE, S1B_ESPERAR_PROPUESTA, 5 , toBeReset);
+        this.registerTransition(S4_RECIBIR_ZEUTHEN_OPONENTE, S1A_ENVIAR_PROPUESTA, 1, toBeReset);
     }
 
     private class EnviarPropuesta extends Behaviour {
@@ -103,6 +105,7 @@ public class FSM_Negotiation extends FSMBehaviour {
             }
             if (sigPropuesta == null) { // if == null => no hay más!
                 System.out.println("NO HAY MAS PELICULAS PARA PROPONER");
+                
             } else { //Arma el mensaje! y lo envia
                 try {
                     Movie movie = new Movie();
@@ -169,6 +172,12 @@ public class FSM_Negotiation extends FSMBehaviour {
                 System.out.println("Agente " + myAgent.getLocalName() + ": Esperando respuesta..");
             }
         }
+        // Los reset agrego a todos los comportamientos q reciban msgs..
+        // La FSM crea una sola instancia con los comp x lo q hay q resetear los valores
+         @Override
+        public void reset() {
+            respuesta = false;
+        }
 
         @Override
         public int onEnd() {
@@ -232,12 +241,12 @@ public class FSM_Negotiation extends FSMBehaviour {
                     IsMyZeuthen zuethenOponente = (IsMyZeuthen) msgZeuthen.getContentObject();
                     IsMyZeuthen miZeuthen = (IsMyZeuthen) this.getDataStore().get(("miZeuthen"));
                     System.out.println("Agente " + myAgent.getLocalName() + ": Recibe zeuthen oponente... " + "(" + zuethenOponente.getValue() + ")");
-                    if (miZeuthen.getValue() > zuethenOponente.getValue()) {
-                        proxEstado = 1; // mi zeuthen es mayor -> enviar propuesta
+                    if (miZeuthen.getValue() < zuethenOponente.getValue()) {
+                        proxEstado = 1; // mi zeuthen es menor -> enviar propuesta
                         received = true;
                         System.out.println("Agente " + myAgent.getLocalName() + ": Mi zeuthen es mayor.. envio propuesta");
                     } else {
-                        proxEstado = 5; // mi zeuthen es menor -> esperar propuesta
+                        proxEstado = 5; // mi zeuthen es mayor -> esperar propuesta (concedo)
                         received = true;
                         System.out.println("Agente " + myAgent.getLocalName() + ": Mi zeuthen es menor.. espero propuesta");
                     }
@@ -252,7 +261,6 @@ public class FSM_Negotiation extends FSMBehaviour {
 
         @Override
         public void reset() {
-            //proxEstado = 5;
             received = false;
         }
         @Override
@@ -284,6 +292,11 @@ public class FSM_Negotiation extends FSMBehaviour {
                 System.out.println("Agente " + myAgent.getLocalName() + ": Esperando propuesta...");
             }
         }
+        @Override
+        public void reset() {
+            esperarPropuesta = false;
+        }
+        
 
         @Override
         public boolean done() {
