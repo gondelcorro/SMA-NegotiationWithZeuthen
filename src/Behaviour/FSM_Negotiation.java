@@ -14,10 +14,7 @@ import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 import jade.lang.acl.UnreadableException;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class FSM_Negotiation extends FSMBehaviour {
 
@@ -155,7 +152,7 @@ public class FSM_Negotiation extends FSMBehaviour {
                     System.out.println("Agente " + myAgent.getLocalName() + ": Propuesta aceptada - FIN DE LA NEGOCIACION");
                     acepta = 1;
                     respuesta = true;
-                    //myAgent.doDelete();
+                    myAgent.doDelete();
                 } else {//si rechazó
                     try {
                         SeeMovie seeMovie = (SeeMovie) msgRespuesta.getContentObject();
@@ -319,7 +316,7 @@ public class FSM_Negotiation extends FSMBehaviour {
                         respuesta.setPerformative(ACLMessage.REJECT_PROPOSAL);
                         SeeMovie miPropuestaSeeMovie = new SeeMovie();
                         miPropuestaSeeMovie.setMovie(agente.getPropuestaActual());
-                        respuesta.setContentObject(miPropuestaSeeMovie);//cuando rechaza la propuesta q recibe, recuerda la suya
+                        respuesta.setContentObject(miPropuestaSeeMovie);//cuando rechaza la propuesta q recibe, recuerda la suya (seeMovie)
                         myAgent.send(respuesta);
                         evaluarYResponder = true;
                         System.out.println("Agente " + myAgent.getLocalName() + ": Propuesta: " + peliPropuesta.getName() + " - RECHAZADA");
