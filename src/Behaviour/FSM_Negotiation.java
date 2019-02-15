@@ -1,6 +1,6 @@
 package Behaviour;
 
-import Agent.AgentNegociator;
+import Agent.AgentNegotiator;
 import Concepts.IsMyZeuthen;
 import Concepts.Movie;
 import Concepts.SeeMovie;
@@ -93,7 +93,7 @@ public class FSM_Negotiation extends FSMBehaviour {
 
         @Override
         public void action() {
-            AgentNegociator agentNegotiator = ((AgentNegociator) myAgent);
+            AgentNegotiator agentNegotiator = ((AgentNegotiator) myAgent);
             Movie sigPropuesta;
             if (primeraVez) {
                 sigPropuesta = agentNegotiator.getPropuestaActual();
@@ -192,7 +192,7 @@ public class FSM_Negotiation extends FSMBehaviour {
         @Override
         public void action() {
             try {
-                AgentNegociator agente = ((AgentNegociator) myAgent);
+                AgentNegotiator agente = ((AgentNegotiator) myAgent);
                 float utilidadPropActual = agente.getUtilidadActual();
                 Movie movie = (Movie) this.getDataStore().get("propuestaDelOtroAgente"); // contiene la propuesta del otro agente
                 float utilidadPropuestaOponente = agente.getUtilidad(movie);
@@ -309,7 +309,7 @@ public class FSM_Negotiation extends FSMBehaviour {
             ACLMessage propuesta = (ACLMessage) this.getDataStore().get("msgPropuesta");//seeMovie
             if (propuesta != null) {
                 try {// Propuesta recibida
-                    AgentNegociator agente = ((AgentNegociator) myAgent);
+                    AgentNegotiator agente = ((AgentNegotiator) myAgent);
                     ACLMessage respuesta = propuesta.createReply();
                     SeeMovie seeMovie = (SeeMovie) propuesta.getContentObject();
                     Movie peliPropuesta = seeMovie.getMovie();
@@ -358,9 +358,9 @@ public class FSM_Negotiation extends FSMBehaviour {
     }
 
     public class FinalizarNegociacion extends OneShotBehaviour {
-
         public void action() {
-            System.out.println("Agente " + myAgent.getLocalName() + ": Terminado.");
+           
+           myAgent.doDelete();
         }
 
     }

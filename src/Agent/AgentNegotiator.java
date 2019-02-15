@@ -17,12 +17,13 @@ import java.io.File;
 import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import util.Utilidades;
 
-public class AgentNegociator extends Agent {
+public class AgentNegotiator extends Agent {
 
     private AID AgentReceiverID;
-    
     private ArrayList<Movie> catalogoPeliculas; //lista de todas las pelis 
     private ArrayList<Utilidades> listaUtilidades; // lista utilidades peli + utildiad
     private Boolean inicio = false;
@@ -48,7 +49,7 @@ public class AgentNegociator extends Agent {
             this.loadUtilidades();
             this.propuestaActual = this.elegirPropuesta(); //elegir la propuesta inicial segun MCP!
 
-            DFAgentDescription[] result = DFService.search(this, dfd);
+            DFAgentDescription[] result = DFService.search(this, dfd, sc);
             if (result.length > 0) {
                 System.out.println("HAY SERVICIO - ME SUSCRIBO");
                 this.addBehaviour(new SubscriptionInitiator(this, DFService.createSubscriptionMessage(this, getDefaultDF(), dfd, sc)) {
@@ -57,7 +58,7 @@ public class AgentNegociator extends Agent {
                         try {
                             DFAgentDescription[] result = DFService.decodeNotification(inform.getContent());
                             if (result.length > 0) {
-                                AgentReceiverID = result[0].getName();
+                                AgentReceiverID = result[0].getName();//si el agente se suscribe, setea el valor del receiver
                                 addBehaviour(new FSM_Negotiation(AgentReceiverID, inicio));
                             }
                         } catch (FIPAException ex) {
@@ -69,6 +70,7 @@ public class AgentNegociator extends Agent {
                 System.out.println("NO HAY SERVICIO - PUBLICO");
                 DFService.register(this, dfd);
                 inicio = true;
+                AgentReceiverID = this.getAID();// si el agente publica, setea su id como receiver
                 this.addBehaviour(new FSM_Negotiation(this.getAID(), inicio));
             }
         } catch (FIPAException ex) {
@@ -78,16 +80,15 @@ public class AgentNegociator extends Agent {
 
     @Override
     protected void takeDown() {
-        /* if (!suscripcionCancelada) {
+        //checkeo q el el agente q el agente q va a deregistrar su servicio del DF, sea el receiver (el receiver siempre es el q publica)
+        if (this.getAID().equals(AgentReceiverID)) {
             try {
                 DFService.deregister(this);
-                suscripcionCancelada = true;
-                System.out.println("Agente " + getAID().getName() + " cancela su servicio.");
-            } catch (FIPAException ex) {
-                System.out.println("FIPA EXCEPTION: " + ex);
+            } catch (FIPAException e) {
+                 System.out.println("Error desregistrando el servicio: " + e);
             }
-        }*/
-        System.out.println("Agente " + getAID().getLocalName() + " terminado.");
+        }
+        System.out.println("Agente " + this.getLocalName() + ": Terminado.");
     }
 
     private void loadPeliculas() {
@@ -153,7 +154,7 @@ public class AgentNegociator extends Agent {
 
     public boolean aceptaPropuesta(Movie peli) {// se acepta si la utilidad d la peli prop es > q la prop actual
         float utilidadPeliPropuesta = getUtilidad(peli);
-        System.out.println("Agente " + this.getLocalName() + ": UPeliPropuesta(" + peli.getName() + ")= " +utilidadPeliPropuesta + " | UMiPropuesta(" + propuestaActual.getName() + ")=" + this.utilidadActual );
+        System.out.println("Agente " + this.getLocalName() + ": UPeliPropuesta(" + peli.getName() + ")= " + utilidadPeliPropuesta + " | UMiPropuesta(" + propuestaActual.getName() + ")=" + this.utilidadActual);
         return (utilidadPeliPropuesta >= this.utilidadActual); //retorna true (acepta) si la utilidad de peliPropuesta es mayor o igual a la utilidad de mi propuesta
     }
 
@@ -167,8 +168,8 @@ public class AgentNegociator extends Agent {
         }
         return utilidad;
     }
-    
-    public float getUtilidadActual(){
+
+    public float getUtilidadActual() {
         return this.utilidadActual;
     }
 
