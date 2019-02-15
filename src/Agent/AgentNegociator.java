@@ -12,27 +12,34 @@ import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
 import jade.lang.acl.ACLMessage;
 import jade.proto.SubscriptionInitiator;
+import jade.util.leap.List;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.math.RoundingMode;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import util.Utilidades;
 
 public class AgentNegociator extends Agent {
 
     private AID AgentReceiverID;
-    private HashMap<Movie, Float> peliculasVotadas; //se supone vistas
-    private HashMap<Movie, Float> utilidades;
+    //private HashMap<Movie, Float> peliculasVotadas; //se supone vistas
+    //private HashMap<Movie, Float> utilidades;
     private ArrayList<Movie> catalogoPeliculas; //todas las pelis 
-    private ArrayList<Movie> propuestasDisponibles; // no vistas
-    private ArrayList<Movie> propDispOrdenadas; // de mayor a manor segun la utilidad
+    private ArrayList<Utilidades> listaUtilidades;
+    //private ArrayList<Movie> propuestasDisponibles; // no vistas
+    //private ArrayList<Movie> propDispOrdenadas; // de mayor a manor segun la utilidad
     private Boolean inicio = false;
     private Movie propuestaActual;
+    private float utilidadActual;
 
     protected void setup() {
         System.out.println("*** Bienvenido agente " + this.getLocalName() + " ***");
+        System.out.println("Sus utilidades son:");
         try {
             getContentManager().registerLanguage(MCPOntology.getCodecInstance());
             getContentManager().registerOntology(MCPOntology.getInstance());
@@ -46,10 +53,10 @@ public class AgentNegociator extends Agent {
             sc.setMaxResults(new Long(1));
 
             this.loadPeliculas();
-            this.loadPeliculasVotadas();
-            this.loadPropuestasDisp();
+            //this.loadPeliculasVotadas();
+            //this.loadPropuestasDisp();
             this.loadUtilidades();
-            this.ordenarPropuestasDisponibles();
+            //this.ordenarPropuestasDisponibles();
             this.propuestaActual = this.elegirPropuesta(); //elegir la propuesta inicial segun MCP!
 
             DFAgentDescription[] result = DFService.search(this, dfd);
@@ -122,6 +129,7 @@ public class AgentNegociator extends Agent {
         }
     }
 
+    /*
     private void loadPeliculasVotadas() {//elijo una peli aleatoriamente del cataloPeliculas y le calculo un rating aleatorio
         peliculasVotadas = new HashMap<>(); //<Moviee, Float>
         ArrayList listaRandomPeliPos = new ArrayList();
@@ -150,18 +158,32 @@ public class AgentNegociator extends Agent {
         Collections.shuffle(propuestasDisponibles);//Randomiza la lista
         System.out.println("\nPelis disponibles: " + propuestasDisponibles);
     }
-
+     */
     private void loadUtilidades() {// utilidades tendra un rating asignado para c/pelicula del catalogo
-        utilidades = new HashMap<>(); //<Moviee, Float>
+        //utilidades = new HashMap<>(); //<Moviee, Float>
+        listaUtilidades = new ArrayList<>();
         for (Movie peli : catalogoPeliculas) {
-            if (peliculasVotadas.containsKey(peli)) {
-                utilidades.put(peli, peliculasVotadas.get(peli));// la peli y el rating q se le puso xq ya esta votada
+            Utilidades utilidad = new Utilidades();
+            utilidad.setMovie(peli);
+            if (this.getLocalName().equals("A")) {
+                float util = (float) Math.abs(Math.random() * 1);
+                int aux = (int) (util * 1000);
+                float result = aux / 1000f;
+                utilidad.setUtilidad(result);
             } else {
-                utilidades.put(peli, (float) Math.abs(Math.random() * (5))); //si la peli no fue votada le genero aleatoriamente un rating
+                float util = (float) Math.abs(Math.random() * 5);
+                int aux = (int) (util * 100);//1243
+                float result = aux / 100f;//12.43
+                utilidad.setUtilidad(result);
             }
+            listaUtilidades.add(utilidad);
         }
+        Collections.sort(listaUtilidades); // el sorte ordena de manera ascendente
+        Collections.reverse(listaUtilidades); // con reverse invierto el orden (descendente)
+        listaUtilidades.forEach(item -> System.out.print(item.getMovie().getName() + " - " + item.getUtilidad() + " | "));
     }
 
+    /*
     private void ordenarPropuestasDisponibles() {
         //Ordenar la lista de peliculas disponibles por mayor utilidad en el hashmap utilidades
         this.propDispOrdenadas = new ArrayList<>();
@@ -176,22 +198,39 @@ public class AgentNegociator extends Agent {
             }
         }
     }
-
+     */
     public Movie elegirPropuesta() { // La eleccion es tomar la 1era pelicula de pelisDisponibles
-        if (!this.propDispOrdenadas.isEmpty()) {
-            propuestaActual = this.propDispOrdenadas.remove(0);
+        if (!this.listaUtilidades.isEmpty()) {
+            Utilidades utilidad = this.listaUtilidades.remove(0);
+            propuestaActual = utilidad.getMovie();
+            utilidadActual = utilidad.getUtilidad();
             return propuestaActual;
         }
         return null;
     }
 
     public boolean aceptaPropuesta(Movie peli) {// se acepta si la utilidad d la peli prop es > q la prop actual
-        System.out.println("Agente " + this.getLocalName() + ": UPeliPropuesta(" + peli.getName() + ")= " + this.getUtilidad(peli) + " | UMiPropuesta(" + propuestaActual.getName() + ")=" + this.getUtilidad(this.propuestaActual));
-        return (this.getUtilidad(peli) >= this.getUtilidad(this.getPropuestaActual()));
+        
+        float utilidadPeliPropuesta = getUtilidad(peli);
+        //float utilidadMiPropuesta = getUtilidad(this.getPropuestaActual());
+        System.out.println("Agente " + this.getLocalName() + ": UPeliPropuesta(" + peli.getName() + ")= " +utilidadPeliPropuesta + " | UMiPropuesta(" + propuestaActual.getName() + ")=" + this.utilidadActual );
+        return (utilidadPeliPropuesta >= this.utilidadActual); //retorna true (acepta) si la utilidad de peliPropuesta es mayor o igual a la utilidad de mi propuesta
     }
 
-    public float getUtilidad(Movie peli) {
-        return utilidades.get(peli);
+    public float getUtilidad(Movie movie) {
+
+        float utilidad = 0;
+        for (Utilidades u : listaUtilidades) {
+            if (u.getMovie().equals(movie)) {
+                utilidad = u.getUtilidad();
+                break;
+            }
+        }
+        return utilidad;
+    }
+    
+    public float getUtilidadActual(){
+        return this.utilidadActual;
     }
 
     public Movie getPropuestaActual() {
