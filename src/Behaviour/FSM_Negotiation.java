@@ -21,10 +21,7 @@ public class FSM_Negotiation extends FSMBehaviour {
     IsMyZeuthen myZeuthen = new IsMyZeuthen();
     DataStore ds = new DataStore();
 
-    //Constantes data store
-    public static String PELICULAS_DISPONIBLES = "PeliculasDisponibles";
     public static String RECEIVER_AID = "ReceiverID";
-
     //Constantes Estados
     private static final String S1A_ENVIAR_PROPUESTA = "EnviarPropuesta";
     private static final String S1B_ESPERAR_PROPUESTA = "EsperarPropuesta";
@@ -36,7 +33,7 @@ public class FSM_Negotiation extends FSMBehaviour {
 
     public FSM_Negotiation(AID agentID, Boolean inicio) {
 
-        ds.put(RECEIVER_AID, agentID); // ID "A"
+        ds.put(RECEIVER_AID, agentID); // ID "A" q publica el servicio. B le envia la 1era propuesta
         System.out.println("*** Inicia Negociacion ***");
         if (inicio) {// si no hay servicio -> publica y espera propuesta
             EsperarPropuesta s1 = new EsperarPropuesta();
@@ -105,17 +102,16 @@ public class FSM_Negotiation extends FSMBehaviour {
             }
             if (sigPropuesta == null) { // if == null => no hay más!
                 System.out.println("NO HAY MAS PELICULAS PARA PROPONER");
-
             } else { //Arma el mensaje! y lo envia
                 try {
                     Movie movie = new Movie();
                     movie.setName(sigPropuesta.getName());
                     SeeMovie seeMovie = new SeeMovie();
                     seeMovie.setMovie(movie);
-                    seeMovie.setDate(new Date(2019, 02, 13));
+                    seeMovie.setDate(new Date(2019, 02, 15));
                     ACLMessage ultMsg = (ACLMessage) this.getDataStore().get("msgUltimo");
                     ACLMessage msgPropuesta;
-                    if (ultMsg != null) {//ya hubo negociacion -> creo respuesta
+                    if (ultMsg != null) {//ya hubo negociacion -> creo respuesta al "msgUltimo"
                         msgPropuesta = ultMsg.createReply();
                         msgPropuesta.setPerformative(ACLMessage.PROPOSE);
                     } else {
@@ -124,7 +120,7 @@ public class FSM_Negotiation extends FSMBehaviour {
                         msgPropuesta.setLanguage(MCPOntology.getCodecInstance().getName());
                         msgPropuesta.setOntology(MCPOntology.getInstance().getName());
                         msgPropuesta.setConversationId("negociacion-pelicula");
-                        msgPropuesta.setReplyWith("propuesta" + System.currentTimeMillis()); // valor unico
+                        msgPropuesta.setReplyWith("propuesta" + System.currentTimeMillis());// valor unico
                     }
                     msgPropuesta.setContentObject(seeMovie);
                     myAgent.send(msgPropuesta);
@@ -155,7 +151,6 @@ public class FSM_Negotiation extends FSMBehaviour {
                     System.out.println("Agente " + myAgent.getLocalName() + ": Propuesta aceptada - FIN DE LA NEGOCIACION");
                     acepta = 1;
                     respuesta = true;
-                    //myAgent.doDelete();
                 } else {//si rechazó
                     try {
                         SeeMovie seeMovie = (SeeMovie) msgRespuesta.getContentObject();
@@ -172,7 +167,6 @@ public class FSM_Negotiation extends FSMBehaviour {
                 System.out.println("Agente " + myAgent.getLocalName() + ": Esperando respuesta..");
             }
         }
-
         // Los reset agrego a todos los comportamientos q reciban msgs..
         // La FSM crea una sola instancia con los comp x lo q hay q resetear los valores
         @Override
@@ -197,7 +191,6 @@ public class FSM_Negotiation extends FSMBehaviour {
 
         @Override
         public void action() {
-
             try {
                 AgentNegociator agente = ((AgentNegociator) myAgent);
                 float utilidadPropActual = agente.getUtilidadActual();
@@ -207,7 +200,7 @@ public class FSM_Negotiation extends FSMBehaviour {
 
                 IsMyZeuthen myZeuthen = new IsMyZeuthen();
                 myZeuthen.setValue(zeuthen);
-                this.getDataStore().put("miZeuthen", myZeuthen);
+                this.getDataStore().put("miZeuthen", myZeuthen); //se guarda el zeuthen de cada agente en el DS
                 System.out.println("Agente " + myAgent.getLocalName() + ": Mi zeuthen es " + myZeuthen.getValue());
 
                 ACLMessage ultimoMsg = (ACLMessage) this.getDataStore().get("msgUltimo"); //cada agente toma su ultimo msg
@@ -350,7 +343,6 @@ public class FSM_Negotiation extends FSMBehaviour {
                 }
             } else {
                 System.out.println("PROPUESTA NULL !!!");
-                block();
             }
         }
 
